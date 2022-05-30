@@ -1,0 +1,30 @@
+version: '2'
+
+services:
+  mysql:
+    container_name: mySqlServer_parser
+    image: mysql:5.6
+    command: mysqld --character-set-server=utf8 --collation-server=utf8_general_ci --init-connect='SET NAMES UTF8;'
+    volumes:
+      - ./docker/mysql:/var/lib/mysql:delegated
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: base
+      MYSQL_USER: master
+      MYSQL_PASSWORD: password
+  php:
+    container_name: php_parser
+    image: dmstr/php-yii2:7.4-fpm-7.0-nginx
+    volumes:
+      - ./:/app:delegated
+      - ./docker/etc_ssl/openssl.cnf:/etc/ssl/openssl.cnf:delegated
+    ports:
+      - "80:80"
+    environment:
+      MYSQL_DATABASE: base
+      MYSQL_USER: master
+      MYSQL_PASSWORD: password
+      MYSQL_HOST: mySqlServer_parser
+      YII_ENV_DEV: true
