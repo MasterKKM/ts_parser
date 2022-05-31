@@ -15,6 +15,7 @@ class ParserController extends Controller
     public function actionBase()
     {
         Yii::$app->log->traceLevel = 3;
+        Yii::$app->cache->flush();
         /** @var Loader $loader */
         $loader = Yii::$container->get('Loader');
         $loader->loadAndParse();
@@ -28,6 +29,7 @@ class ParserController extends Controller
     public function actionPlaces()
     {
         Yii::$app->log->traceLevel = 3;
+        Yii::$app->cache->flush();
         /** @var Loader $loader */
         $loader = Yii::$container->get('Loader');
         $loader->countLoader();
@@ -40,6 +42,7 @@ class ParserController extends Controller
     public function actionPlacesUpdate()
     {
         Yii::$app->log->traceLevel = 3;
+        Yii::$app->cache->flush();
         /** @var Loader $loader */
         $loader = Yii::$container->get('Loader');
         $loader->workPlacesUpdate();
