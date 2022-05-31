@@ -8,6 +8,7 @@ use app\models\Vacancy;
 use yii\data\ActiveDataProvider;
 use yii\filters\AccessControl;
 use yii\helpers\ArrayHelper;
+use function Webmozart\Assert\Tests\StaticAnalysis\null;
 
 class StatisticController extends BaseController
 {
@@ -152,6 +153,10 @@ class StatisticController extends BaseController
         \Yii::$app->response->sendContentAsFile($string, 'Сто самых высокооплачиваемых вакансий.txt');
     }
 
+    /**
+     * @return string|null
+     * @throws \yii\web\RangeNotSatisfiableHttpException
+     */
     public function actionCountPlaces()
     {
         $model = new JobName();
@@ -159,7 +164,20 @@ class StatisticController extends BaseController
 
         if ($model->load(\Yii::$app->request->post())) {
             if ($model->validate()) {
-                $table = $model->createRequest()->andWhere(['social_protected_id' => null])->all();
+                $table = $model
+                    ->createRequest()
+                    ->orderBy('`salary` ASC')
+                    ->andWhere(['employment_id' => $this->employmentTable()])
+                    ->andWhere(['<>', 'work_places', 0])
+                    ->all();
+                if ($model->as_texts == 1 && !empty($table)) {
+                    $string = $this->renderPartial('job_counts_text', [
+                        'model' => $model,
+                        'table' => $table,
+                    ]);
+                    \Yii::$app->response->sendContentAsFile($string, 'Распределение вакансий по запрлатам.txt');
+                    return null;
+                }
             }
         }
 

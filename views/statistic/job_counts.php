@@ -1,5 +1,6 @@
 <?php
 
+use app\models\SocialProtected;
 use yii\helpers\Html;
 use yii\widgets\ActiveForm;
 
@@ -10,9 +11,12 @@ use yii\widgets\ActiveForm;
 ?>
 <div class="job_counts">
 
+    <h1>Статистика по распределению вакансий(рабочих мест) по зарплатам</h1>
     <?php $form = ActiveForm::begin(); ?>
 
     <?= $form->field($model, 'job_name') ?>
+    <?= $form->field($model, 'social_protected_id')->dropDownList(SocialProtected::createForSelect()) ?>
+    <?= $form->field($model, 'as_texts')->checkbox() ?>
 
     <div class="form-group">
         <?= Html::submitButton('Ok', ['class' => 'btn btn-primary']) ?>
@@ -29,5 +33,6 @@ use yii\widgets\ActiveForm;
                 </p>
 
             <?php endforeach; endif; ?>
+
     </div>
 </div><!-- job_counts -->
