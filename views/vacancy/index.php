@@ -46,7 +46,7 @@ $this->params['breadcrumbs'][] = $this->title;
             ],
             [
                 'attribute' => 'social_protected_id',
-                'filter' => ArrayHelper::merge(['0' => 'Без ограничений', '-1' => 'Все социальные вакансии'], ArrayHelper::map(SocialProtected::find()->all(), 'id', 'name')),
+                'filter' => SocialProtected::createForSelect(),
                 'value' => function (Vacancy $model) {
                     return $model->socialProtected === null ? '' : $model->socialProtected->name;
                 },
