@@ -48,8 +48,8 @@ AppAsset::register($this);
                 'items' => [
                     ['label' => 'Социальное резервирование', 'url' => ['/social/index']],
                     ['label' => 'Типы занятости', 'url' => ['/employment/index']],
-                    ['label' => 'Графики работы', 'url' => '/schedule/index'],
-                    ['label' => 'Вакансии', 'url' => '/vacancy/index'],
+                    ['label' => 'Графики работы', 'url' => ['/schedule/index']],
+                    ['label' => 'Вакансии', 'url' => ['/vacancy/index']],
                     ['label' => 'Компании', 'url' => ['/company/index']],
                 ]
             ],
