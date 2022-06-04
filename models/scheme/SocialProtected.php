@@ -8,7 +8,7 @@ use Yii;
  * This is the model class for table "social_protected".
  *
  * @property int $id
- * @property string|null $name
+ * @property string $name Социальное резервирование
  *
  * @property Vacancy[] $vacancies
  */
@@ -28,7 +28,8 @@ class SocialProtected extends \yii\db\ActiveRecord
     public function rules()
     {
         return [
-            [['name'], 'string', 'max' => 255],
+            [['name'], 'required'],
+            [['name'], 'string'],
         ];
     }
 
@@ -39,7 +40,7 @@ class SocialProtected extends \yii\db\ActiveRecord
     {
         return [
             'id' => 'ID',
-            'name' => 'Name',
+            'name' => 'Социальное резервирование',
         ];
     }
 
