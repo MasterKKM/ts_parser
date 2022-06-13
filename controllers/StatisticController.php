@@ -4,6 +4,7 @@ namespace app\controllers;
 
 use app\models\Employment;
 use app\models\form\JobName;
+use app\models\SocialProtected;
 use app\models\Vacancy;
 use yii\data\ActiveDataProvider;
 use yii\filters\AccessControl;
@@ -22,6 +23,7 @@ class StatisticController extends BaseController
                 'class' => AccessControl::class,
                 'rules' => [
                     [
+                        /*
                         'actions' => [
                             'index',
                             'vacancies',
@@ -32,6 +34,7 @@ class StatisticController extends BaseController
                             'vac-dump',
                             'count-places',
                         ],
+                        */
                         'allow' => true,
                         'roles' => ['@'],
                     ],
@@ -186,4 +189,25 @@ class StatisticController extends BaseController
             'table' => $table,
         ]);
     }
+
+    /**
+     * Сто вакансий для несовершеннолетних.
+     * @throws \yii\web\RangeNotSatisfiableHttpException
+     */
+    public function actionVacLittleDump()
+    {
+        $socialIds = SocialProtected::find()->select('id')->where("`name` LIKE '%Несовершеннолетние работники%'")->asArray()->column();
+        $models = Vacancy::find()
+            ->where(['social_protected_id' => $socialIds])
+            ->orderBy('salary_min DESC')
+            ->limit(100)
+            ->all();
+
+        $string = $this->renderPartial('vac-dump', [
+            'models' => $models,
+        ]);
+
+        \Yii::$app->response->sendContentAsFile($string, 'Сто вакансий для несовершеннолетних.txt');
+    }
+
 }
