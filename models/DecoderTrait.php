@@ -27,7 +27,7 @@ trait DecoderTrait
             $model->load($params, '');
         }
         if (!$model->save() || !$model->refresh()) {
-            throw new InvalidArgumentException('Ошибка даннх:' . print_r($model->errors, true));
+            throw new InvalidArgumentException('Ошибка даннх объекта ' . get_class($model) . ' ' . print_r($model->errors, true));
         }
         return $model;
     }
