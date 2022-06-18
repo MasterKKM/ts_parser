@@ -10,7 +10,10 @@ use yii\console\Controller;
 class ParserController extends Controller
 {
     /**
+     * Загрузка основных данных через API.
      * @throws GuzzleException
+     * @throws \yii\base\InvalidConfigException
+     * @throws \yii\di\NotInstantiableException
      */
     public function actionBase()
     {
@@ -22,6 +25,8 @@ class ParserController extends Controller
     }
 
     /**
+     * Дополнительная загрузка кол-ва вакансий.
+     * (Через не документированный запрос)
      * @throws \yii\base\InvalidConfigException
      * @throws \yii\di\NotInstantiableException
      * @throws \Exception
@@ -36,6 +41,8 @@ class ParserController extends Controller
     }
 
     /**
+     * Обновление кол-ва вакансий.
+     * (Через не документированный запрос)
      * @throws \yii\base\InvalidConfigException
      * @throws \yii\di\NotInstantiableException
      */
