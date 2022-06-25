@@ -6,6 +6,7 @@ use app\models\Vacancy;
 use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\Exception\RequestException;
 use Throwable;
 use Yii;
 use yii\base\BaseObject;
@@ -121,6 +122,10 @@ class Loader extends BaseObject
             ->asArray()
             ->all();
 
+        if (YII_ENV_DEV) {
+            $count = count($uidTable);
+            echo "Загрузка информации о рабочих местах по $count вакансиям.\n";
+        }
         $this->workPlacesLoader($uidTable);
     }
 
@@ -137,10 +142,15 @@ class Loader extends BaseObject
             ->asArray()
             ->all();
 
+        if (YII_ENV_DEV) {
+            $count = count($uidTable);
+            echo "Загрузка информации о рабочих местах по $count вакансиям.\n";
+        }
         $this->workPlacesLoader($uidTable);
     }
 
     /**
+     * Заполнение таблицы вакансий колличеством рабочих мест.
      * @param array $uidTable
      * @throws Exception
      */
@@ -149,8 +159,13 @@ class Loader extends BaseObject
         $pauseCount = 0;
         $allCount = 0;
         $allWP = 0;
+        $errors = 0;
         foreach ($uidTable as $item) {
             $count = $this->workPlaceLoader($item['uid'], $item['cid']);
+            if ($count === null) {
+                $errors++;
+                continue;
+            }
             Vacancy::updateAll(['work_places' => $count], ['uid' => $item['uid']]);
             if ($pauseCount++ >= 9) {
                 sleep($this->sleepTime);
@@ -160,7 +175,8 @@ class Loader extends BaseObject
             $allWP += $count;
         }
         if (YII_ENV_DEV) {
-            Yii::info("Загружено {$allCount} вакансий {$allWP} рабочих мест.", __METHOD__);
+            Yii::info("Загружено {$allCount} вакансий {$allWP} рабочих мест. Ошибок загрузки: $errors.", __METHOD__);
+            echo "\nЗагружено {$allCount} вакансий {$allWP} рабочих мест. Ошибок загрузки: $errors.\n";
         }
     }
 
@@ -171,29 +187,57 @@ class Loader extends BaseObject
      * @return int
      * @throws Exception
      */
-    private function workPlaceLoader(string $uid, string $cid): int
+    private function workPlaceLoader(string $uid, string $cid): ?int
     {
         $url = $this->requestForId . "companyId={$cid}&vacancyId={$uid}";
 
-        // TODO Переделать, что-бы 404 ошибка не вызывала эксепшена.
         $client = new Client();
         try {
             $res = $client->request('GET', $url);
-        } catch (Throwable $e) {
-            Yii::warning("Error request ({$e->getCode()}) workPlaces for {$cid}/{$uid}", __METHOD__);
-            if (YII_ENV_DEV) {
-                echo "error: {$e->getMessage()} ({$e->getCode()}) Вакансия убрана из общего доступа?\n";
+        } catch (RequestException $e) {
+            $code = $this->extractHttpCode($e);
+            if ($code == 999) {
+                Yii::warning("Vacancy {$cid}/{$uid} is hidden by the employer.");
+                return 0;
             }
-            return 0;
+            if ($code !== null) {
+                Yii::warning("Error request Http:($code} workPlaces for {$cid}/{$uid} error message: {$e->getMessage()}", __METHOD__);
+            }
+            return null;
+        } catch (Throwable $e) {
+            Yii::warning("Error " . get_class($e) . " request ({$e->getCode()}) workPlaces for {$cid}/{$uid} error message: {$e->getMessage()}", __METHOD__);
+            if (YII_ENV_DEV) {
+                echo "Error " . get_class($e) . " request ({$e->getCode()}) workPlaces for {$cid}/{$uid} error message: {$e->getMessage()}\n";
+            }
+            return null;
         }
+
         $body = $res->getBody();
         $text = $body->read($body->getSize());
         $table = Json::decode($text);
         $result = $table;
         if (($result['code'] ?? '') !== 'SUCCESS') {
-            Yii::error("Error request no SUCCESS in result. Vacancy: {$cid}/{$uid} Request: $text", __METHOD__);
-            throw new Exception("Оошибка в ответе на вакансию {$cid}/{$uid}.");
+            Yii::error("Error request no SUCCESS in result. Vacancy: $cid/$uid} Request:$text", __METHOD__);
+            return null;
         }
         return ArrayHelper::getValue($result, 'data.vacancy.workPlaces', 1);
+    }
+
+    /**
+     * Извлекаем HTTP код ошибки.
+     * @param RequestException $e
+     * @return int|null
+     */
+    private function extractHttpCode(RequestException $e): ?int
+    {
+        foreach ($e->getPrevious()->getTrace() as $item) {
+            if ('GuzzleHttp\Psr7\Response' == ($item['class'] ?? null)
+                && '__construct' == ($item['function'] ?? null)
+                && is_array($item['args'] ?? null)
+            ) {
+                return $item['args'][0] ?? null;
+            }
+        }
+        return null;
     }
 }
