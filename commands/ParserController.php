@@ -24,7 +24,7 @@ class ParserController extends Controller
         /** @var Loader $loader */
         $loader = Yii::$container->get('Loader');
         $loader->loadAndParse();
-        $loader->workPlacesUpdate();
+        $loader->countLoader();
     }
 
     /**

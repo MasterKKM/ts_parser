@@ -5,6 +5,7 @@ namespace app\models\console;
 use app\models\Vacancy;
 use Exception;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\RequestException;
 use Throwable;
@@ -25,6 +26,8 @@ class Loader extends BaseObject
     public int $startPage = 0;
     public int $pageSize = 50;
     public int $sleepTime = 2;
+    public int $sleepAfterError = 20;
+    public int $maxHttpErrors = 5;
     public bool $updateOnChanged = false;
     public bool $clearOnStart = false;
 
@@ -81,7 +84,23 @@ class Loader extends BaseObject
     public function arrayLoader(string $url): array
     {
         $client = new Client();
-        $res = $client->request('GET', $url);
+        $errorCount = 0;
+        do {
+            try {
+                $res = null;
+                $res = $client->request('GET', $url);
+            } catch (ConnectException $e) {
+                Yii::warning("Error url: $url " . $e->getMessage());
+                if (YII_ENV_DEV) {
+                    echo "Ошибка при загрузке страницы ($url): {$e->getMessage()}\r";
+                }
+                if ($errorCount++ >= $this->maxHttpErrors) {
+                    throw new $e;
+                }
+                sleep($this->sleepAfterError);
+            }
+        } while ($res === null);
+
         $body = $res->getBody();
         $text = $body->read($body->getSize());
         $table = json_decode($text, true);
@@ -179,7 +198,7 @@ class Loader extends BaseObject
                 $errors++;
                 continue;
             }
-            Vacancy::updateAll(['work_places' => $count], ['uid' => $item['uid'], 'company_id' => $item['cid']]);
+            Vacancy::updateAll(['work_places' => $count], ['uid' => $item['uid']]);
 
             // Ограничиваем нагрузку на сервер, и имитируем работу пользователя.
             if ($pauseCount++ >= 9) {
@@ -247,6 +266,10 @@ class Loader extends BaseObject
      */
     private function extractHttpCode(RequestException $e): ?int
     {
+        if ($e->getPrevious() === null) {
+            file_put_contents('/app/log.txt', print_r($e, true) . "\n\n\n************************************************************\n\n\n", FILE_APPEND);
+            return null;
+        }
         foreach ($e->getPrevious()->getTrace() as $item) {
             if ('GuzzleHttp\Psr7\Response' == ($item['class'] ?? null)
                 && '__construct' == ($item['function'] ?? null)
