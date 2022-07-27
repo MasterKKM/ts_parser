@@ -103,8 +103,18 @@ class Loader extends BaseObject
 
         $body = $res->getBody();
         $text = $body->read($body->getSize());
-        $table = json_decode($text, true);
+        $table = Json::decode($text);
 
+        $this->_tableCheck($table);
+        return $table;
+    }
+
+    /**
+     * @param $table
+     * @throws Exception
+     */
+    private function _tableCheck($table): void
+    {
         if (!isset(
             $table['status'],
             $table['meta'],
@@ -124,8 +134,6 @@ class Loader extends BaseObject
             Yii::error("Not business data in request", __METHOD__);
             throw new Exception('Оошибка загрузки: отсутствие записей в ответе.');
         }
-
-        return $table;
     }
 
     /**
@@ -186,7 +194,7 @@ class Loader extends BaseObject
      * @return bool
      * @throws Exception
      */
-    private function workPlacesLoader(array $uidTable): bool
+    protected function workPlacesLoader(array $uidTable): bool
     {
         $pauseCount = 0;
         $allCount = 0;
@@ -223,7 +231,7 @@ class Loader extends BaseObject
      * @return int
      * @throws Exception
      */
-    private function workPlaceLoader(string $uid, string $cid): ?int
+    protected function workPlaceLoader(string $uid, string $cid): ?int
     {
         $url = $this->requestForId . "companyId={$cid}&vacancyId={$uid}";
 
@@ -233,15 +241,15 @@ class Loader extends BaseObject
         } catch (RequestException $e) {
             $code = $this->extractHttpCode($e);
             if ($code == 999) {
-                Yii::warning("Vacancy {$cid}/{$uid} is hidden by the employer.");
+                Yii::error("Vacancy {$cid}/{$uid} is hidden by the employer.");
                 return 0;
             }
             if ($code !== null) {
-                Yii::warning("Error request Http:($code} workPlaces for {$cid}/{$uid} error message: {$e->getMessage()}", __METHOD__);
+                Yii::error("Error request Http:($code} workPlaces for {$cid}/{$uid} error message: {$e->getMessage()}", __METHOD__);
             }
             return null;
         } catch (Throwable $e) {
-            Yii::warning("Error " . get_class($e) . " request ({$e->getCode()}) workPlaces for {$cid}/{$uid} error message: {$e->getMessage()}", __METHOD__);
+            Yii::error("Error " . get_class($e) . " request ({$e->getCode()}) workPlaces for {$cid}/{$uid} error message: {$e->getMessage()}", __METHOD__);
             if (YII_ENV_DEV) {
                 echo "Error " . get_class($e) . " request ({$e->getCode()}) workPlaces for {$cid}/{$uid} error message: {$e->getMessage()}\n";
             }
@@ -250,8 +258,7 @@ class Loader extends BaseObject
 
         $body = $res->getBody();
         $text = $body->read($body->getSize());
-        $table = Json::decode($text);
-        $result = $table;
+        $result = Json::decode($text);
         if (($result['code'] ?? '') !== 'SUCCESS') {
             Yii::error("Error request no SUCCESS in result. Vacancy: $cid/$uid} Request:$text", __METHOD__);
             return null;
@@ -260,14 +267,14 @@ class Loader extends BaseObject
     }
 
     /**
-     * Извлекаем HTTP код ошибки.
+     * Извлекаем HTTP код не стандартнойй ошибки.
      * @param RequestException $e
      * @return int|null
      */
     private function extractHttpCode(RequestException $e): ?int
     {
         if ($e->getPrevious() === null) {
-            file_put_contents('/app/log.txt', print_r($e, true) . "\n\n\n************************************************************\n\n\n", FILE_APPEND);
+            file_put_contents(Yii::getAlias('@runtime/decodeAnomaly.txt'), print_r($e, true) . "\n\n\n************************************************************\n\n\n", FILE_APPEND);
             return null;
         }
         foreach ($e->getPrevious()->getTrace() as $item) {
