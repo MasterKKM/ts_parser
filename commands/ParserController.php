@@ -9,6 +9,24 @@ use yii\console\Controller;
 
 class ParserController extends Controller
 {
+
+    /**
+     * Общая загрузка вакансий заданного региона.
+     * @throws GuzzleException
+     * @throws \yii\base\InvalidConfigException
+     * @throws \yii\di\NotInstantiableException
+     * @throws \Exception
+     */
+    public function actionAll()
+    {
+        Yii::$app->log->traceLevel = 3;
+        Yii::$app->cache->flush();
+        /** @var Loader $loader */
+        $loader = Yii::$container->get('Loader');
+        $loader->loadAndParse();
+        $loader->countLoader();
+    }
+
     /**
      * Загрузка основных данных через API.
      * @throws GuzzleException
@@ -45,6 +63,7 @@ class ParserController extends Controller
      * (Через не документированный запрос)
      * @throws \yii\base\InvalidConfigException
      * @throws \yii\di\NotInstantiableException
+     * @throws \Exception
      */
     public function actionPlacesUpdate()
     {

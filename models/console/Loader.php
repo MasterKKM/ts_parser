@@ -5,6 +5,7 @@ namespace app\models\console;
 use app\models\Vacancy;
 use Exception;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\RequestException;
 use Throwable;
@@ -25,6 +26,8 @@ class Loader extends BaseObject
     public int $startPage = 0;
     public int $pageSize = 50;
     public int $sleepTime = 2;
+    public int $sleepAfterError = 20;
+    public int $maxHttpErrors = 5;
     public bool $updateOnChanged = false;
     public bool $clearOnStart = false;
 
@@ -81,7 +84,23 @@ class Loader extends BaseObject
     public function arrayLoader(string $url): array
     {
         $client = new Client();
-        $res = $client->request('GET', $url);
+        $errorCount = 0;
+        do {
+            try {
+                $res = null;
+                $res = $client->request('GET', $url);
+            } catch (ConnectException $e) {
+                Yii::warning("Error url: $url " . $e->getMessage());
+                if (YII_ENV_DEV) {
+                    echo "Ошибка при загрузке страницы ($url): {$e->getMessage()}\r";
+                }
+                if ($errorCount++ >= $this->maxHttpErrors) {
+                    throw new $e;
+                }
+                sleep($this->sleepAfterError);
+            }
+        } while ($res === null);
+
         $body = $res->getBody();
         $text = $body->read($body->getSize());
         $table = Json::decode($text);
@@ -118,23 +137,19 @@ class Loader extends BaseObject
     }
 
     /**
-     * Обновить колличество рабочих мест в вакансиях.
+     * Обновить колличество рабочих мест в скрытых вакансиях.
      * @throws Exception
      */
     public function workPlacesUpdate(): void
     {
-        $uidTable = Vacancy::find()
-            ->select(['uid', 'cid' => '`company`.`companycode`'])
-            ->joinWith('company')
-            ->where('`work_places` = 0')
-            ->asArray()
-            ->all();
-
-        if (YII_ENV_DEV) {
-            $count = count($uidTable);
-            echo "Загрузка информации о рабочих местах по $count вакансиям.\n";
-        }
-        $this->workPlacesLoader($uidTable);
+        $this->placesLoader(function () {
+            return Vacancy::find()
+                ->select(['uid', 'cid' => '`company`.`companycode`'])
+                ->joinWith('company')
+                ->where('`work_places` = 0')
+                ->asArray()
+                ->all();
+        });
     }
 
     /**
@@ -143,26 +158,43 @@ class Loader extends BaseObject
      */
     public function countLoader(): void
     {
-        $uidTable = Vacancy::find()
-            ->select(['uid', 'cid' => '`company`.`companycode`'])
-            ->joinWith('company')
-            ->where('`work_places` IS NULL')
-            ->asArray()
-            ->all();
+        $this->placesLoader(function () {
+            return Vacancy::find()
+                ->select(['uid', 'cid' => '`company`.`companycode`'])
+                ->joinWith('company')
+                ->where('`work_places` IS NULL')
+                ->asArray()
+                ->all();
+        });
+    }
 
-        if (YII_ENV_DEV) {
-            $count = count($uidTable);
-            echo "Загрузка информации о рабочих местах по $count вакансиям.\n";
-        }
-        $this->workPlacesLoader($uidTable);
+    /**
+     * @param $function
+     * @throws Exception
+     */
+    private function placesLoader($function): void
+    {
+        do {
+            $uidTable = $function();
+
+            if (YII_ENV_DEV) {
+                $count = count($uidTable);
+                echo "Загрузка информации о рабочих местах по $count вакансиям.\n";
+            }
+            $noErrors = $this->workPlacesLoader($uidTable);
+            if (!$noErrors) {
+                sleep($this->sleepTime);
+            }
+        } while (!$noErrors);
     }
 
     /**
      * Заполнение таблицы вакансий колличеством рабочих мест.
      * @param array $uidTable
+     * @return bool
      * @throws Exception
      */
-    protected function workPlacesLoader(array $uidTable): void
+    protected function workPlacesLoader(array $uidTable): bool
     {
         $pauseCount = 0;
         $allCount = 0;
@@ -175,10 +207,13 @@ class Loader extends BaseObject
                 continue;
             }
             Vacancy::updateAll(['work_places' => $count], ['uid' => $item['uid']]);
+
+            // Ограничиваем нагрузку на сервер, и имитируем работу пользователя.
             if ($pauseCount++ >= 9) {
                 sleep($this->sleepTime);
                 $pauseCount = 0;
             }
+
             $allCount++;
             $allWP += $count;
         }
@@ -186,6 +221,7 @@ class Loader extends BaseObject
             Yii::info("Загружено {$allCount} вакансий {$allWP} рабочих мест. Ошибок загрузки: $errors.", __METHOD__);
             echo "\nЗагружено {$allCount} вакансий {$allWP} рабочих мест. Ошибок загрузки: $errors.\n";
         }
+        return $errors == 0;
     }
 
     /**
